@@ -1,0 +1,27 @@
+name: Test StreamWide Scraper
+
+on:
+  workflow_dispatch: # این یعنی فقط وقتی خودم دکمه را زدم اجرا شود
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 lxml
+
+      - name: Run Scraper
+        env:
+          WEBSITE_USERNAME: ${{ secrets.WEBSITE_USERNAME }}
+          WEBSITE_PASSWORD: ${{ secrets.WEBSITE_PASSWORD }}
+          TEST_MOVIE_URL: 'https://streamwide.tv/t/spider-man-brand-new-day-fb980ca7/'
+        run: python scraper.py
