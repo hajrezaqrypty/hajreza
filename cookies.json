@@ -1,0 +1,54 @@
+[
+    {
+        "domain": "streamwide.tv",
+        "expirationDate": 1818606962.405736,
+        "hostOnly": true,
+        "httpOnly": true,
+        "name": "did",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "0ddfce954c6642e690696cab559f770a"
+    },
+    {
+        "domain": "streamwide.tv",
+        "expirationDate": 1788296625.187446,
+        "hostOnly": true,
+        "httpOnly": true,
+        "name": "sessionid",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "fkabcl8grjhyns24zd4sw4cxyh6sf9zb"
+    },
+    {
+        "domain": "streamwide.tv",
+        "expirationDate": 1818537560.97119,
+        "hostOnly": true,
+        "httpOnly": false,
+        "name": "csrftoken",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "vq885xUtFT0rRkDngladJLWbjDSHyDTY"
+    },
+    {
+        "domain": "streamwide.tv",
+        "expirationDate": 1818623961.239895,
+        "hostOnly": true,
+        "httpOnly": false,
+        "name": "swfp",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "ab712879"
+    }
+]
