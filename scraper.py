@@ -4,7 +4,6 @@ import os
 from bs4 import BeautifulSoup
 
 BASE_URL = "https://streamwide.tv"
-LOGIN_URL = f"{BASE_URL}/auth/login"
 COOKIE_FILE = "cookies.json"
 
 class StreamWideScraper:
@@ -17,7 +16,6 @@ class StreamWideScraper:
         self.load_cookies()
 
     def load_cookies(self):
-        """بارگذاری کوکی‌ها از فایل JSON (اگر وجود داشته باشند)"""
         if os.path.exists(COOKIE_FILE):
             with open(COOKIE_FILE, 'r', encoding='utf-8') as f:
                 cookies = json.load(f)
@@ -26,7 +24,6 @@ class StreamWideScraper:
             print("کوکی‌های موجود بارگذاری شدند.")
 
     def save_cookies(self):
-        """ذخیره کوکی‌های جدید در فایل JSON"""
         new_cookies = []
         for cookie in self.session.cookies:
             new_cookies.append({"domain": cookie.domain, "name": cookie.name, "value": cookie.value})
@@ -35,39 +32,11 @@ class StreamWideScraper:
         print("کوکی‌های جدید ذخیره شدند.")
 
     def auto_login(self):
-        """لاگین خودکار با استفاده از یوزر و پسورد ذخیره شده در GitHub Secrets"""
         print("کوکی نامعتبر است. در حال تلاش برای لاگین...")
-        
-        # دریافت توکن CSRF از صفحه اصلی
-        res = self.session.get(BASE_URL)
-        soup = BeautifulSoup(res.text, 'lxml')
-        csrf_meta = soup.find('meta', {'name': 'csrf-token'})
-        csrf_token = csrf_meta['content'] if csrf_meta else None
-
-        headers = {
-            'X-CSRFToken': csrf_token,
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json'
-        }
-        
-        # خواندن یوزرنیم و پسورد از متغیرهای محیطی گیت‌هاب
-        payload = {
-            "email": os.environ.get("WEBSITE_USERNAME"),
-            "password": os.environ.get("WEBSITE_PASSWORD")
-        }
-
-        response = self.session.post(LOGIN_URL, json=payload, headers=headers)
-        
-        if response.status_code in [200, 201]:
-            print("لاگین موفقیت‌آمیز بود!")
-            self.save_cookies()
-            return True
-        else:
-            print(f"خطا در لاگین: {response.status_code} - {response.text}")
-            return False
+        # در آینده برای لاگین خودکار با API واقعی جایگزین می‌شود
+        return False
 
     def get_download_links(self, movie_url):
-        """استخراج لینک‌های دانلود از صفحه فیلم"""
         print(f"در حال بررسی صفحه: {movie_url}")
         response = self.session.get(movie_url)
         soup = BeautifulSoup(response.text, 'lxml')
@@ -78,14 +47,12 @@ class StreamWideScraper:
             
         is_logged_in = tp_dl_div.get('data-logged-in', '0')
         
-        # اگر لاگین نبود، اول لاگین می‌کند و دوباره صفحه را لود می‌کند
         if is_logged_in == '0':
             if self.auto_login():
                 return self.get_download_links(movie_url)
             else:
-                return ["خطا: عدم توانایی در لاگین."]
+                return ["خطا: کوکی منقضی شده و امکان لاگین خودکار وجود ندارد."]
                 
-        # استخراج لینک API مخفی دانلود
         download_api_path = tp_dl_div.get('data-download-url')
         if not download_api_path:
             return ["خطا: لینک API پیدا نشد."]
@@ -96,12 +63,32 @@ class StreamWideScraper:
         api_response = self.session.get(api_url)
         
         if api_response.status_code == 200:
-            data = api_response.json()
-            links = []
-            # اینجا ساختار JSON سایت را چاپ می‌کنیم تا ببینیم لینک‌ها کجا هستند
-            print("ساختار دریافت شده از API:")
-            print(json.dumps(data, indent=2, ensure_ascii=False))
-            return data
+            data = api_response.json().get('download', {})
+            versions = data.get('versions', [])
+            domains = data.get('domains', {})
+            
+            # دیکشنری برای تبدیل کدهای زبان به فارسی
+            lang_map = {"DUB": "دوبله", "RAW": "زبان اصلی", "SUB": "زیرنویس"}
+            
+            formatted_links = []
+            for v in versions:
+                quality = v.get('quality', 'نامشخص')
+                lang_code = v.get('lang', '')
+                lang_fa = lang_map.get(lang_code, lang_code)
+                size = v.get('size_h', '')
+                url_path = v.get('url', '')
+                dc_key = str(v.get('dc', '1'))
+                
+                # ساخت لینک نهایی دانلود
+                domain_info = domains.get(dc_key, {})
+                full_domain = domain_info.get('out_domain', 'https://s4.antstg.com') # پیش‌فرض خارج
+                full_url = full_domain + url_path
+                
+                # متن نهایی برای بات تلگرام
+                link_text = f"🎬 {quality} | {lang_fa} | حجم: {size}\n🔗 {full_url}"
+                formatted_links.append(link_text)
+                
+            return formatted_links
         else:
             return [f"خطا در API: {api_response.status_code}"]
 
@@ -109,7 +96,13 @@ class StreamWideScraper:
 if __name__ == "__main__":
     scraper = StreamWideScraper()
     
-    # گرفتن لینک از متغیر محیطی گیت‌هاب (برای تست)
     test_url = os.environ.get("TEST_MOVIE_URL", "https://streamwide.tv/t/spider-man-brand-new-day-fb980ca7/")
     
     links = scraper.get_download_links(test_url)
+    
+    print("\n" + "="*40)
+    print("لینک‌های نهایی استخراج شده:")
+    print("="*40)
+    for link in links:
+        print(link)
+        print("-" * 30)
