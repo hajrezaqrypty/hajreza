@@ -14,14 +14,14 @@ def send_telegram_message(text):
         return
         
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    # تقسیم متن‌های طولانی به قطعات ۳۰۰۰ کاراکتری
-    max_length = 3000
+    max_length = 4000
     chunks = [text[i:i+max_length] for i in range(0, len(text), max_length)]
     
     for chunk in chunks:
         payload = {
             "chat_id": CHAT_ID,
             "text": chunk,
+            "parse_mode": "HTML",
             "disable_web_page_preview": True
         }
         try:
@@ -49,7 +49,7 @@ class StreamWideScraper:
         else:
             print("ERROR: cookies.json not found!")
 
-    def get_raw_api_data(self, movie_url):
+    def get_download_links(self, movie_url):
         try:
             response = self.session.get(movie_url)
             soup = BeautifulSoup(response.text, 'lxml')
@@ -65,13 +65,74 @@ class StreamWideScraper:
             api_url = BASE_URL + download_api_path
             api_response = self.session.get(api_url)
             
-            if api_response.status_code == 200:
-                # گرفتن متن خام پاسخ API
-                raw_text = api_response.text
-                return f"🔍 متن خام دریافتی از API:\n\n{raw_text}"
-            else:
+            if api_response.status_code != 200:
                 return f"❌ خطا در API: {api_response.status_code}"
                 
+            data = api_response.json().get('download', {})
+            versions = data.get('versions', [])
+            seasons = data.get('seasons', [])
+            domains = data.get('domains', {})
+            iran_warning = data.get('iran_warning', '')
+            
+            lang_map = {"DUB": "دوبله فارسی", "RAW": "زبان اصلی", "SUB": "زیرنویس چسبیده"}
+            formatted_links = []
+            
+            if iran_warning:
+                formatted_links.append(f"⚠️ توجه: {iran_warning}\n" + "="*30)
+            
+            # حالت اول: استخراج لینک فیلم‌ها
+            if versions:
+                for v in versions:
+                    quality = v.get('quality', 'نامشخص')
+                    lang_code = v.get('lang', '')
+                    lang_fa = lang_map.get(lang_code, lang_code)
+                    size = v.get('size_h', '')
+                    url_path = v.get('url', '')
+                    dc_key = str(v.get('dc', '1'))
+                    
+                    if url_path:
+                        domain_info = domains.get(dc_key, {})
+                        out_url = domain_info.get('out_domain', 'https://s4.antstg.com') + url_path
+                        in_url = domain_info.get('in_domain', 'https://s4.709711.ir.cdn.ir') + url_path
+                        
+                        text = f"🎬 کیفیت: {quality}\n🗣 زبان: {lang_fa}\n📦 حجم: {size}\n\n🌍 لینک خارج:\n{out_url}\n\n🇮🇷 لینک داخل ایران:\n{in_url}\n" + "="*30
+                        formatted_links.append(text)
+                        
+            # حالت دوم: استخراج لینک سریال‌ها
+            elif seasons:
+                for season in seasons:
+                    season_label = season.get('label', 'فصل نامشخص')
+                    formatted_links.append(f"\n🌟 {season_label} 🌟\n" + "="*30)
+                    
+                    for ep in season.get('episodes', []):
+                        ep_num = ep.get('num_fa', ep.get('num', '?'))
+                        ep_title = ep.get('label', '')
+                        ep_versions = ep.get('versions', [])
+                        
+                        if not ep_versions:
+                            continue
+                            
+                        formatted_links.append(f"\n📺 قسمت {ep_num} {ep_title}")
+                        
+                        for v in ep_versions:
+                            quality = v.get('quality', 'نامشخص')
+                            lang_code = v.get('lang', '')
+                            lang_fa = lang_map.get(lang_code, lang_code)
+                            size = v.get('size_h', '')
+                            url_path = v.get('url', '')
+                            dc_key = str(v.get('dc', '1'))
+                            
+                            if url_path:
+                                domain_info = domains.get(dc_key, {})
+                                out_url = domain_info.get('out_domain', 'https://s4.antstg.com') + url_path
+                                in_url = domain_info.get('in_domain', 'https://s4.709711.ir.cdn.ir') + url_path
+                                
+                                text = f"  🎬 {quality} | {lang_fa} | حجم: {size}\n  🌍 خارج: {out_url}\n  🇮🇷 ایران: {in_url}"
+                                formatted_links.append(text)
+                        formatted_links.append("-" * 30)
+            
+            return "\n\n".join(formatted_links) if formatted_links else "❌ هیچ لینکی پیدا نشد."
+            
         except Exception as e:
             return f"❌ Exception: {str(e)}"
 
@@ -80,9 +141,9 @@ if __name__ == "__main__":
     movie_url = os.environ.get("MOVIE_URL")
     
     if movie_url:
-        print(f"Getting raw API data for: {movie_url}")
-        raw_data = scraper.get_raw_api_data(movie_url)
+        print(f"Getting links for: {movie_url}")
+        links_text = scraper.get_download_links(movie_url)
         print("Scraping finished. Sending to Telegram...")
-        send_telegram_message(raw_data)
+        send_telegram_message(links_text)
     else:
         print("No URL provided.")
