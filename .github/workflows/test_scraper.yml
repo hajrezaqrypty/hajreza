@@ -10,7 +10,7 @@ on:
     types: [quick_search]
 
 permissions:
-  contents: write
+  contents: write # اجازه ذخیره فایل‌ها در گیت‌هاب
 
 jobs:
   scrape:
@@ -46,5 +46,5 @@ jobs:
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           git add db/
-          git commit -m "Auto update: ${{ github.event.client_payload.query }}" || echo "No changes to commit"
+          git commit -m "Auto update DB: ${{ github.event.client_payload.query }}" || echo "No changes to commit"
           git push
