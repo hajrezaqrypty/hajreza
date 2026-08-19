@@ -9,6 +9,9 @@ on:
   repository_dispatch:
     types: [run_scraper]
 
+permissions:
+  contents: write # برای ذخیره فایل در گیت‌هاب
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -29,5 +32,14 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
+          CF_WORKER_URL: ${{ secrets.CF_WORKER_URL }}
           MOVIE_URL: ${{ github.event.client_payload.movie_url || github.event.inputs.movie_url }}
         run: python scraper.py
+
+      - name: Commit and push processed URLs
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add processed_urls.txt
+          git commit -m "Added processed URL: ${{ github.event.client_payload.movie_url || github.event.inputs.movie_url }}" || echo "No changes to commit"
+          git push
