@@ -27,7 +27,7 @@
     },
     {
         "domain": "streamwide.tv",
-        "expirationDate": 1818537560.97119,
+        "expirationDate": 1818581848.122722,
         "hostOnly": true,
         "httpOnly": false,
         "name": "csrftoken",
@@ -40,7 +40,7 @@
     },
     {
         "domain": "streamwide.tv",
-        "expirationDate": 1818623961.239895,
+        "expirationDate": 1818668248.499473,
         "hostOnly": true,
         "httpOnly": false,
         "name": "swfp",
