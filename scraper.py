@@ -206,7 +206,6 @@ def run_scraper():
     ensure_dir()
     scraper = StreamWideScraper()
     
-    # دریافت لیست فیلم‌های موجود در دیتابیس از کلودفلر
     cf_index = fetch_index_from_cf()
     index_data = cf_index if (cf_index and len(cf_index) > 0) else load_index()
     
@@ -229,14 +228,19 @@ def run_scraper():
             if movie_url == LAST_SEEN_URL and LAST_SEEN_URL: break
             if not first_movie_url: first_movie_url = movie_url
             
-        # چک کردن اینکه آیا فیلم قبلاً در دیتابیس ثبت شده یا خیر
-        is_in_db = any(m_data.get("url") == movie_url for m_data in index_data.values())
-        
-        if not is_in_db:
-            print(f"  -> {title} is NEW")
+        # تغییر کلیدی در این بخش:
+        # اگر MODE برابر با 'update' باشد (درخواست آپدیت آرشیو از طرف ادمین)، دیگر چک نمی‌کند و مستقیماً آپدیت می‌کند
+        if MODE == "update":
+            print(f"  -> [UPDATE] Forcing update for {title}")
             movies_to_process.append({"title": title, "url": movie_url})
         else:
-            print(f"  -> {title} already exists in DB. Skipping.")
+            # برای درخواست‌های عادی، چک می‌کند که فیلم تکراری نباشد
+            is_in_db = any(m_data.get("url") == movie_url for m_data in index_data.values())
+            if not is_in_db:
+                print(f"  -> {title} is NEW")
+                movies_to_process.append({"title": title, "url": movie_url})
+            else:
+                print(f"  -> {title} already exists in DB. Skipping.")
         
     if MODE == "auto_update" and first_movie_url:
         new_last_seen_url = first_movie_url
@@ -254,7 +258,7 @@ def run_scraper():
             break
         elif movie_data is None: continue
             
-        # ارسال به دیتابیس کلودفلر
+        # ارسال به دیتابیس کلودفلر (این بخش فیلم قدیمی را آپدیت می‌کند)
         send_to_cf("/api/add", movie_data)
         
         # ساخت فایل فیزیکی در گیت‌هاب برای آرشیو شما
