@@ -39,16 +39,40 @@ def build_cf_url(endpoint):
 
 def send_to_cf(endpoint, payload):
     cf_url = build_cf_url(endpoint)
-    if not cf_url or not CF_API_KEY:
-        print("  [CLOUDFLARE] Missing CF_API_URL or CF_API_KEY")
-        return False
+    if not cf_url or not CF_API_KEY: return False
     try:
         res = requests.post(cf_url, json=payload, headers={"X-API-Key": CF_API_KEY}, timeout=60)
-        print(f"  [CLOUDFLARE] POST {endpoint} -> {res.status_code}")
         return 200 <= res.status_code < 300
-    except Exception as e:
-        print(f"  [CLOUDFLARE] Error: {e}")
+    except:
         return False
+
+def fetch_index_from_cf():
+    cf_url = build_cf_url("/api/index")
+    if not cf_url or not CF_API_KEY: return {}
+    try:
+        res = requests.get(cf_url, headers={"X-API-Key": CF_API_KEY}, timeout=30)
+        if res.status_code == 200:
+            data = res.json()
+            return data if isinstance(data, dict) else {}
+    except:
+        return {}
+
+def push_index_to_cf(index_data):
+    send_to_cf("/api/index", {"index": index_data})
+
+def load_index():
+    if os.path.exists(INDEX_FILE):
+        try:
+            with open(INDEX_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_index(index_data):
+    ensure_dir()
+    with open(INDEX_FILE, 'w', encoding='utf-8') as f:
+        json.dump(index_data, f, indent=4, ensure_ascii=False)
 
 def notify_quick_done(movies, last_seen_url="", site_error=False):
     if not CHAT_ID or not REQ_KEY: return False
@@ -78,18 +102,8 @@ class StreamWideScraper:
         except:
             pass
 
-    def check_logged_out(self, soup):
-        gate = soup.find('div', class_='tp-dl-gate-over')
-        if gate:
-            text = gate.get_text()
-            if "وارد شو" in text or "login" in text.lower():
-                return True
-        return False
-
     def search_catalog(self, query, mode):
         target_url = "https://streamwide.tv/catalog/?sort=new" if mode == "auto_update" else f"https://streamwide.tv/catalog/?q={quote(query)}"
-        print(f"  [SCRAPER] Searching: {target_url}")
-        
         res = self.session.get(target_url)
         if res.status_code != 200: return []
             
@@ -101,26 +115,24 @@ class StreamWideScraper:
             title_el = card.find(class_="sw-card-title")
             meta_el = card.find(class_="sw-card-meta")
             link = card.get("href", "")
-            
             if not (title_el and link): continue
             
             title = title_el.get_text(strip=True)
             meta = meta_el.get_text(strip=True) if meta_el else ""
             movie_url = link if link.startswith("http") else BASE_URL + link
-            
             year = meta.split("·")[0].strip() if meta else ""
             movies.append({"title": title, "meta": meta, "year": year, "url": movie_url})
         return movies
 
     def process_movie(self, movie_url):
-        print(f"  -> Deep scraping: {movie_url}")
         res = self.session.get(movie_url)
         soup = BeautifulSoup(res.text, 'lxml')
         
-        if self.check_logged_out(soup):
+        # بررسی لاگ اوت بودن
+        gate = soup.find('div', class_='tp-dl-gate-over')
+        if gate and ("وارد شو" in gate.get_text() or "login" in gate.get_text().lower()):
             return "logout"
             
-        # استخراج متادیتا
         title_en_tag = soup.find('h1', class_='tp-title')
         title_fa_tag = soup.find('div', class_='tp-title-fa')
         badge_tag = soup.find('span', class_='sw-badge')
@@ -148,9 +160,7 @@ class StreamWideScraper:
         if not tp_dl_div: return None
             
         download_api_path = tp_dl_div.get('data-download-url')
-        api_url = BASE_URL + download_api_path
-        api_res = self.session.get(api_url)
-        
+        api_res = self.session.get(BASE_URL + download_api_path)
         if api_res.status_code != 200: return None
             
         data = api_res.json().get('download', {})
@@ -161,55 +171,32 @@ class StreamWideScraper:
         lang_map = {"DUB": "دوبله فارسی", "RAW": "زبان اصلی", "SUB": "زیرنویس چسبیده"}
         downloads = []
         
-        # ساختار درختی برای دیتابیس (منطبق با کد بات شما)
         if versions:
             for v in versions:
-                quality = v.get('quality', '')
                 lang_fa = lang_map.get(v.get('lang', ''), '')
                 size = v.get('size_h', '')
                 url_path = v.get('url', '')
+                quality = v.get('quality', '')
                 dc_key = str(v.get('dc', '1'))
-                
                 if url_path:
                     domain_info = domains.get(dc_key, {})
-                    out_url = domain_info.get('out_domain', '') + url_path
-                    in_url = domain_info.get('in_domain', '') + url_path
-                    
-                    # لینک خارج
-                    downloads.append({
-                        "url": out_url, "size": size, "server": "خارج ایران",
-                        "language": lang_fa, "quality": quality, "season": "", "episode": ""
-                    })
-                    # لینک داخل
-                    downloads.append({
-                        "url": in_url, "size": size, "server": "داخل ایران",
-                        "language": lang_fa, "quality": quality, "season": "", "episode": ""
-                    })
-                    
+                    downloads.append({"url": domain_info.get('out_domain', '') + url_path, "size": size, "server": "خارج ایران", "language": lang_fa, "quality": quality, "season": "", "episode": ""})
+                    downloads.append({"url": domain_info.get('in_domain', '') + url_path, "size": size, "server": "داخل ایران", "language": lang_fa, "quality": quality, "season": "", "episode": ""})
         elif seasons:
             for season in seasons:
                 season_label = season.get('label', '')
                 for ep in season.get('episodes', []):
                     ep_num = ep.get('num_fa', ep.get('num', '?'))
                     for v in ep.get('versions', []):
-                        quality = v.get('quality', '')
                         lang_fa = lang_map.get(v.get('lang', ''), '')
                         size = v.get('size_h', '')
                         url_path = v.get('url', '')
+                        quality = v.get('quality', '')
                         dc_key = str(v.get('dc', '1'))
                         if url_path:
                             domain_info = domains.get(dc_key, {})
-                            out_url = domain_info.get('out_domain', '') + url_path
-                            in_url = domain_info.get('in_domain', '') + url_path
-                            
-                            downloads.append({
-                                "url": out_url, "size": size, "server": "خارج ایران",
-                                "language": lang_fa, "quality": quality, "season": season_label, "episode": str(ep_num)
-                            })
-                            downloads.append({
-                                "url": in_url, "size": size, "server": "داخل ایران",
-                                "language": lang_fa, "quality": quality, "season": season_label, "episode": str(ep_num)
-                            })
+                            downloads.append({"url": domain_info.get('out_domain', '') + url_path, "size": size, "server": "خارج ایران", "language": lang_fa, "quality": quality, "season": season_label, "episode": str(ep_num)})
+                            downloads.append({"url": domain_info.get('in_domain', '') + url_path, "size": size, "server": "داخل ایران", "language": lang_fa, "quality": quality, "season": season_label, "episode": str(ep_num)})
                             
         metadata["downloads"] = downloads
         metadata["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -219,8 +206,12 @@ def run_scraper():
     ensure_dir()
     scraper = StreamWideScraper()
     
+    # دریافت لیست فیلم‌های موجود در دیتابیس از کلودفلر
+    cf_index = fetch_index_from_cf()
+    index_data = cf_index if (cf_index and len(cf_index) > 0) else load_index()
+    
     cards_info = scraper.search_catalog(SEARCH_TERM, MODE)
-    print(f"  [SCRAPER] Found {len(cards_info)} cards")
+    print(f"Found {len(cards_info)} cards on website.")
     
     movies_to_process = []
     first_movie_url = ""
@@ -229,6 +220,7 @@ def run_scraper():
     
     for info in cards_info:
         if len(movies_to_process) >= max_count: break
+        
         title = info["title"]
         if info["year"]: title = f"{title} ({info['year']})"
         movie_url = info["url"]
@@ -237,7 +229,14 @@ def run_scraper():
             if movie_url == LAST_SEEN_URL and LAST_SEEN_URL: break
             if not first_movie_url: first_movie_url = movie_url
             
-        movies_to_process.append({"title": title, "url": movie_url})
+        # چک کردن اینکه آیا فیلم قبلاً در دیتابیس ثبت شده یا خیر
+        is_in_db = any(m_data.get("url") == movie_url for m_data in index_data.values())
+        
+        if not is_in_db:
+            print(f"  -> {title} is NEW")
+            movies_to_process.append({"title": title, "url": movie_url})
+        else:
+            print(f"  -> {title} already exists in DB. Skipping.")
         
     if MODE == "auto_update" and first_movie_url:
         new_last_seen_url = first_movie_url
@@ -255,20 +254,33 @@ def run_scraper():
             break
         elif movie_data is None: continue
             
+        # ارسال به دیتابیس کلودفلر
         send_to_cf("/api/add", movie_data)
         
-        # ذخیره در گیت‌هاب
+        # ساخت فایل فیزیکی در گیت‌هاب برای آرشیو شما
         safe_title = re.sub(r'[\\/*?:"<>|]', "", movie_data["title"]).replace(" ", "_")[:80]
         filepath = os.path.join(DB_DIR, f"{movie_data['type']}_{safe_title}_{movie_data['year']}.json")
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(movie_data, f, indent=4, ensure_ascii=False)
             
+        # آپدیت فایل ایندکس
+        index_data[filepath] = {
+            "title": movie_data["title"], 
+            "year": movie_data["year"], 
+            "url": item["url"], 
+            "updated_at": movie_data["updated_at"]
+        }
+        
         new_movies_to_send.append({"title": item["title"], "url": item["url"]})
         
     if stop_reason == "logout":
         notify_logout()
     else:
         notify_quick_done(new_movies_to_send, new_last_seen_url)
+        
+    # ذخیره نهایی ایندکس در گیت‌هاب و کلودفلر
+    save_index(index_data)
+    push_index_to_cf(index_data)
 
 if __name__ == "__main__":
     run_scraper()
