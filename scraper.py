@@ -65,77 +65,77 @@ class StreamWideScraper:
             api_url = BASE_URL + download_api_path
             api_response = self.session.get(api_url)
             
+            domains = {}
+            iran_warning = ''
+            versions = []
+            
             if api_response.status_code == 200:
                 try:
                     data = api_response.json().get('download', {})
+                    versions = data.get('versions', [])
+                    domains = data.get('domains', {})
+                    iran_warning = data.get('iran_warning', '')
                 except:
-                    data = {}
+                    pass
+            
+            lang_map = {"DUB": "دوبله فارسی", "RAW": "زبان اصلی", "SUB": "زیرنویس چسبیده"}
+            formatted_links = []
+            
+            if iran_warning:
+                formatted_links.append(f"⚠️ توجه: {iran_warning}\n" + "="*30)
+            
+            # حالت اول: استخراج لینک فیلم‌ها از API
+            for v in versions:
+                quality = v.get('quality', 'نامشخص')
+                lang_code = v.get('lang', '')
+                lang_fa = lang_map.get(lang_code, lang_code)
+                size = v.get('size_h', '')
+                url_path = v.get('url', '')
+                dc_key = str(v.get('dc', '1'))
+                
+                if url_path:
+                    domain_info = domains.get(dc_key, {})
+                    out_url = domain_info.get('out_domain', 'https://s4.antstg.com') + url_path
+                    in_url = domain_info.get('in_domain', 'https://s4.709711.ir.cdn.ir') + url_path
                     
-                versions = data.get('versions', [])
-                domains = data.get('domains', {})
-                iran_warning = data.get('iran_warning', '')
-                
-                lang_map = {"DUB": "دوبله فارسی", "RAW": "زبان اصلی", "SUB": "زیرنویس چسبیده"}
-                formatted_links = []
-                
-                if iran_warning:
-                    formatted_links.append(f"⚠️ توجه: {iran_warning}\n" + "="*30)
-                
-                # حالت اول: استخراج لینک فیلم‌ها از API (اگر versions وجود داشته باشد)
-                if versions:
-                    for v in versions:
-                        quality = v.get('quality', 'نامشخص')
-                        lang_code = v.get('lang', '')
-                        lang_fa = lang_map.get(lang_code, lang_code)
-                        size = v.get('size_h', '')
-                        url_path = v.get('url', '')
-                        dc_key = str(v.get('dc', '1'))
-                        
+                    text = f"🎬 کیفیت: {quality}\n🗣 زبان: {lang_fa}\n📦 حجم: {size}\n\n🌍 لینک خارج:\n{out_url}\n\n🇮🇷 لینک داخل ایران:\n{in_url}\n" + "="*30
+                    formatted_links.append(text)
+            
+            # حالت دوم: استخراج لینک سریال‌ها از داخل HTML
+            tp_eps_div = soup.find('div', {'class': 'tp-eps'})
+            if tp_eps_div:
+                episodes = tp_eps_div.find_all('div', {'class': 'tp-ep'})
+                for ep in episodes:
+                    ep_num_tag = ep.find('div', {'class': 'tp-ep-num'})
+                    ep_num = ep_num_tag.text.strip() if ep_num_tag else '?'
+                    
+                    title_tag = ep.find('div', {'class': 'tp-ep-title'})
+                    ep_title = ""
+                    tags = []
+                    if title_tag:
+                        spans = title_tag.find_all('span')
+                        if spans:
+                            ep_title = spans[0].text.strip()
+                        tag_spans = title_tag.find_all('span', {'class': 'tp-file-tag'})
+                        tags = [t.text.strip() for t in tag_spans]
+                    
+                    lang_str = " | ".join(tags) if tags else ''
+                    
+                    size_tag = ep.find('span', {'class': 'tp-file-size'})
+                    size = size_tag.text.strip() if size_tag else ''
+                    
+                    dl_btn = ep.find('button', {'class': 'tp-file-dl'})
+                    if dl_btn:
+                        url_path = dl_btn.get('data-rel', '')
+                        dc_key = str(dl_btn.get('data-dc', '1'))
                         domain_info = domains.get(dc_key, {})
                         out_url = domain_info.get('out_domain', 'https://s4.antstg.com') + url_path
                         in_url = domain_info.get('in_domain', 'https://s4.709711.ir.cdn.ir') + url_path
                         
-                        text = f"🎬 کیفیت: {quality}\n🗣 زبان: {lang_fa}\n📦 حجم: {size}\n\n🌍 لینک خارج:\n{out_url}\n\n🇮🇷 لینک داخل ایران:\n{in_url}\n" + "="*30
+                        text = f"📺 قسمت {ep_num} | {ep_title} | {lang_str}\n📦 حجم: {size}\n\n🌍 لینک خارج:\n{out_url}\n\n🇮🇷 لینک داخل ایران:\n{in_url}\n" + "="*30
                         formatted_links.append(text)
-                
-                # حالت دوم: استخراج لینک سریال‌ها از داخل HTML (اگر versions خالی باشد)
-                else:
-                    tp_eps_div = soup.find('div', {'class': 'tp-eps'})
-                    if tp_eps_div:
-                        episodes = tp_eps_div.find_all('div', {'class': 'tp-ep'})
-                        for ep in episodes:
-                            ep_num_tag = ep.find('div', {'class': 'tp-ep-num'})
-                            ep_num = ep_num_tag.text.strip() if ep_num_tag else '?'
                             
-                            title_tag = ep.find('div', {'class': 'tp-ep-title'})
-                            ep_title = ""
-                            tags = []
-                            if title_tag:
-                                spans = title_tag.find_all('span')
-                                if spans:
-                                    ep_title = spans[0].text.strip()
-                                tag_spans = title_tag.find_all('span', {'class': 'tp-file-tag'})
-                                tags = [t.text.strip() for t in tag_spans]
-                            
-                            lang_str = " | ".join(tags) if tags else ''
-                            
-                            size_tag = ep.find('span', {'class': 'tp-file-size'})
-                            size = size_tag.text.strip() if size_tag else ''
-                            
-                            dl_btn = ep.find('button', {'class': 'tp-file-dl'})
-                            if dl_btn:
-                                url_path = dl_btn.get('data-rel', '')
-                                dc_key = str(dl_btn.get('data-dc', '1'))
-                                domain_info = domains.get(dc_key, {})
-                                out_url = domain_info.get('out_domain', 'https://s4.antstg.com') + url_path
-                                in_url = domain_info.get('in_domain', 'https://s4.709711.ir.cdn.ir') + url_path
-                                
-                                text = f"📺 قسمت {ep_num} | {ep_title} | {lang_str}\n📦 حجم: {size}\n\n🌍 لینک خارج:\n{out_url}\n\n🇮🇷 لینک داخل ایران:\n{in_url}\n" + "="*30
-                                formatted_links.append(text)
-                                
-                return "\n\n".join(formatted_links) if formatted_links else "❌ هیچ لینکی پیدا نشد."
-            else:
-                return f"❌ خطا در API: {api_response.status_code}"
+            return "\n\n".join(formatted_links) if formatted_links else "❌ هیچ لینکی پیدا نشد."
         except Exception as e:
             return f"❌ Exception: {str(e)}"
 
