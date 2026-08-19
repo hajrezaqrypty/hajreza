@@ -1,7 +1,13 @@
-name: Test StreamWide Scraper
+name: Run StreamWide Scraper
 
 on:
-  workflow_dispatch: # این یعنی فقط وقتی خودم دکمه را زدم اجرا شود
+  workflow_dispatch:
+    inputs:
+      movie_url:
+        description: 'Movie URL'
+        required: true
+  repository_dispatch:
+    types: [run_scraper]
 
 jobs:
   scrape:
@@ -21,7 +27,7 @@ jobs:
 
       - name: Run Scraper
         env:
-          WEBSITE_USERNAME: ${{ secrets.WEBSITE_USERNAME }}
-          WEBSITE_PASSWORD: ${{ secrets.WEBSITE_PASSWORD }}
-          TEST_MOVIE_URL: 'https://streamwide.tv/t/spider-man-brand-new-day-fb980ca7/'
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          MOVIE_URL: ${{ github.event.client_payload.movie_url || github.event.inputs.movie_url }}
         run: python scraper.py
