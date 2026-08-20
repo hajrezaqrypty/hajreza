@@ -128,9 +128,13 @@ class StreamWideScraper:
         res = self.session.get(movie_url)
         soup = BeautifulSoup(res.text, 'lxml')
         
-        # بررسی لاگ اوت بودن
-        gate = soup.find('div', class_='tp-dl-gate-over')
-        if gate and ("وارد شو" in gate.get_text() or "login" in gate.get_text().lower()):
+        tp_dl_div = soup.find('div', {'id': 'tp-dl'})
+        if not tp_dl_div: return None
+        
+        # بررسی بسیار دقیق لاگ اوت بودن (اضافه شده)
+        is_logged_in = tp_dl_div.get('data-logged-in', '1')
+        if is_logged_in == '0':
+            print("  [LOGOUT DETECTED] Cookie expired!")
             return "logout"
             
         title_en_tag = soup.find('h1', class_='tp-title')
@@ -156,9 +160,6 @@ class StreamWideScraper:
             "plot": og_desc['content'] if og_desc else '',
         }
         
-        tp_dl_div = soup.find('div', {'id': 'tp-dl'})
-        if not tp_dl_div: return None
-            
         download_api_path = tp_dl_div.get('data-download-url')
         api_res = self.session.get(BASE_URL + download_api_path)
         if api_res.status_code != 200: return None
@@ -228,13 +229,10 @@ def run_scraper():
             if movie_url == LAST_SEEN_URL and LAST_SEEN_URL: break
             if not first_movie_url: first_movie_url = movie_url
             
-        # تغییر کلیدی در این بخش:
-        # اگر MODE برابر با 'update' باشد (درخواست آپدیت آرشیو از طرف ادمین)، دیگر چک نمی‌کند و مستقیماً آپدیت می‌کند
         if MODE == "update":
             print(f"  -> [UPDATE] Forcing update for {title}")
             movies_to_process.append({"title": title, "url": movie_url})
         else:
-            # برای درخواست‌های عادی، چک می‌کند که فیلم تکراری نباشد
             is_in_db = any(m_data.get("url") == movie_url for m_data in index_data.values())
             if not is_in_db:
                 print(f"  -> {title} is NEW")
@@ -253,21 +251,19 @@ def run_scraper():
     for item in movies_to_process:
         movie_data = scraper.process_movie(item["url"])
         
+        # اگر لاگ اوت باشد، اسکریپت متوقف می‌شود و به ادمین پیام داده می‌شود
         if movie_data == "logout":
             stop_reason = "logout"
             break
         elif movie_data is None: continue
             
-        # ارسال به دیتابیس کلودفلر (این بخش فیلم قدیمی را آپدیت می‌کند)
         send_to_cf("/api/add", movie_data)
         
-        # ساخت فایل فیزیکی در گیت‌هاب برای آرشیو شما
         safe_title = re.sub(r'[\\/*?:"<>|]', "", movie_data["title"]).replace(" ", "_")[:80]
         filepath = os.path.join(DB_DIR, f"{movie_data['type']}_{safe_title}_{movie_data['year']}.json")
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(movie_data, f, indent=4, ensure_ascii=False)
             
-        # آپدیت فایل ایندکس
         index_data[filepath] = {
             "title": movie_data["title"], 
             "year": movie_data["year"], 
@@ -278,11 +274,11 @@ def run_scraper():
         new_movies_to_send.append({"title": item["title"], "url": item["url"]})
         
     if stop_reason == "logout":
+        # ارسال درخواست اطلاع‌رسانی به ادمین
         notify_logout()
     else:
         notify_quick_done(new_movies_to_send, new_last_seen_url)
         
-    # ذخیره نهایی ایندکس در گیت‌هاب و کلودفلر
     save_index(index_data)
     push_index_to_cf(index_data)
 
