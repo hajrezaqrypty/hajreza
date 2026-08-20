@@ -154,5 +154,17 @@
         "year": "۲۰۲۰",
         "url": "https://streamwide.tv/t/dragon-soldiers-2020-d624bd8f/",
         "updated_at": "2026-08-20 10:11:08"
+    },
+    "db/Movie_Dragon_Force_۱۹۸۲.json": {
+        "title": "Dragon Force",
+        "year": "۱۹۸۲",
+        "url": "https://streamwide.tv/t/dragon-force-2f4ac49a/",
+        "updated_at": "2026-08-20 10:11:59"
+    },
+    "db/Movie_Dragon_The_Bruce_Lee_Story_۱۹۹۳.json": {
+        "title": "Dragon: The Bruce Lee Story",
+        "year": "۱۹۹۳",
+        "url": "https://streamwide.tv/t/dragon-the-bruce-lee-story-9f14bae4/",
+        "updated_at": "2026-08-20 10:12:04"
     }
 }
