@@ -166,5 +166,35 @@
         "year": "۱۹۹۳",
         "url": "https://streamwide.tv/t/dragon-the-bruce-lee-story-9f14bae4/",
         "updated_at": "2026-08-20 10:12:04"
+    },
+    "db/Series_Spider-Noir_۲۰۲۶.json": {
+        "title": "Spider-Noir",
+        "year": "۲۰۲۶",
+        "url": "https://streamwide.tv/t/spider-noir-162f166f/",
+        "updated_at": "2026-08-20 10:15:11"
+    },
+    "db/Movie_Spider-Man_Brand_New_Day_۲۰۲۶.json": {
+        "title": "Spider-Man: Brand New Day",
+        "year": "۲۰۲۶",
+        "url": "https://streamwide.tv/t/spider-man-brand-new-day-fb980ca7/",
+        "updated_at": "2026-08-20 10:15:15"
+    },
+    "db/Series_Spider-Man_۲۰۰۳.json": {
+        "title": "Spider-Man",
+        "year": "۲۰۰۳",
+        "url": "https://streamwide.tv/t/spider-man-96ab3575/",
+        "updated_at": "2026-08-20 10:15:20"
+    },
+    "db/Series_Spider-Man_and_His_Amazing_Friends_۱۹۸۱.json": {
+        "title": "Spider-Man and His Amazing Friends",
+        "year": "۱۹۸۱",
+        "url": "https://streamwide.tv/t/spider-man-and-his-amazing-friends-624ef786/",
+        "updated_at": "2026-08-20 10:15:24"
+    },
+    "db/Series_Spider-Man_The_Animated_Series_۱۹۹۴.json": {
+        "title": "Spider-Man: The Animated Series",
+        "year": "۱۹۹۴",
+        "url": "https://streamwide.tv/t/spider-man-the-animated-series-3400c814/",
+        "updated_at": "2026-08-20 10:15:29"
     }
 }
