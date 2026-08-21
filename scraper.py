@@ -7,7 +7,6 @@ from urllib.parse import quote
 from bs4 import BeautifulSoup
 
 DB_DIR = "db"
-INDEX_FILE = os.path.join(DB_DIR, "index.json")
 
 # متغیرهای محیطی
 CF_API_URL = os.environ.get("CF_API_URL", "").strip()
@@ -46,33 +45,15 @@ def send_to_cf(endpoint, payload):
     except:
         return False
 
-def fetch_index_from_cf():
-    cf_url = build_cf_url("/api/index")
-    if not cf_url or not CF_API_KEY: return {}
+def fetch_existing_urls():
+    cf_url = build_cf_url("/api/urls")
+    if not cf_url or not CF_API_KEY: return set()
     try:
         res = requests.get(cf_url, headers={"X-API-Key": CF_API_KEY}, timeout=30)
         if res.status_code == 200:
-            data = res.json()
-            return data if isinstance(data, dict) else {}
+            return set(res.json())
     except:
-        return {}
-
-def push_index_to_cf(index_data):
-    send_to_cf("/api/index", {"index": index_data})
-
-def load_index():
-    if os.path.exists(INDEX_FILE):
-        try:
-            with open(INDEX_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_index(index_data):
-    ensure_dir()
-    with open(INDEX_FILE, 'w', encoding='utf-8') as f:
-        json.dump(index_data, f, indent=4, ensure_ascii=False)
+        return set()
 
 def notify_quick_done(movies, last_seen_url="", site_error=False):
     if not CHAT_ID or not REQ_KEY: return False
@@ -131,7 +112,6 @@ class StreamWideScraper:
         tp_dl_div = soup.find('div', {'id': 'tp-dl'})
         if not tp_dl_div: return None
         
-        # بررسی بسیار دقیق لاگ اوت بودن (اضافه شده)
         is_logged_in = tp_dl_div.get('data-logged-in', '1')
         if is_logged_in == '0':
             print("  [LOGOUT DETECTED] Cookie expired!")
@@ -207,8 +187,9 @@ def run_scraper():
     ensure_dir()
     scraper = StreamWideScraper()
     
-    cf_index = fetch_index_from_cf()
-    index_data = cf_index if (cf_index and len(cf_index) > 0) else load_index()
+    # گرفتن لیست فیلم‌های موجود مستقیماً از دیتابیس D1
+    existing_urls = fetch_existing_urls()
+    print(f"Loaded {len(existing_urls)} existing URLs from DB.")
     
     cards_info = scraper.search_catalog(SEARCH_TERM, MODE)
     print(f"Found {len(cards_info)} cards on website.")
@@ -233,8 +214,7 @@ def run_scraper():
             print(f"  -> [UPDATE] Forcing update for {title}")
             movies_to_process.append({"title": title, "url": movie_url})
         else:
-            is_in_db = any(m_data.get("url") == movie_url for m_data in index_data.values())
-            if not is_in_db:
+            if movie_url not in existing_urls:
                 print(f"  -> {title} is NEW")
                 movies_to_process.append({"title": title, "url": movie_url})
             else:
@@ -251,7 +231,6 @@ def run_scraper():
     for item in movies_to_process:
         movie_data = scraper.process_movie(item["url"])
         
-        # اگر لاگ اوت باشد، اسکریپت متوقف می‌شود و به ادمین پیام داده می‌شود
         if movie_data == "logout":
             stop_reason = "logout"
             break
@@ -259,28 +238,18 @@ def run_scraper():
             
         send_to_cf("/api/add", movie_data)
         
+        # ذخیره فایل فیزیکی در گیت‌هاب برای آرشیو شما
         safe_title = re.sub(r'[\\/*?:"<>|]', "", movie_data["title"]).replace(" ", "_")[:80]
         filepath = os.path.join(DB_DIR, f"{movie_data['type']}_{safe_title}_{movie_data['year']}.json")
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(movie_data, f, indent=4, ensure_ascii=False)
             
-        index_data[filepath] = {
-            "title": movie_data["title"], 
-            "year": movie_data["year"], 
-            "url": item["url"], 
-            "updated_at": movie_data["updated_at"]
-        }
-        
         new_movies_to_send.append({"title": item["title"], "url": item["url"]})
         
     if stop_reason == "logout":
-        # ارسال درخواست اطلاع‌رسانی به ادمین
         notify_logout()
     else:
         notify_quick_done(new_movies_to_send, new_last_seen_url)
-        
-    save_index(index_data)
-    push_index_to_cf(index_data)
 
 if __name__ == "__main__":
     run_scraper()
