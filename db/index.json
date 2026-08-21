@@ -202,5 +202,35 @@
         "year": "۲۰۲۲",
         "url": "https://streamwide.tv/t/house-of-the-dragon-b9552d19/",
         "updated_at": "2026-08-21 10:38:10"
+    },
+    "db/Movie_Odyssey_۲۰۲۵.json": {
+        "title": "Odyssey",
+        "year": "۲۰۲۵",
+        "url": "https://streamwide.tv/t/odyssey-699657e8/",
+        "updated_at": "2026-08-21 10:43:11"
+    },
+    "db/Movie_A_Writer's_Odyssey_2_۲۰۲۵.json": {
+        "title": "A Writer's Odyssey 2",
+        "year": "۲۰۲۵",
+        "url": "https://streamwide.tv/t/a-writers-odyssey-2-f34d3cd5/",
+        "updated_at": "2026-08-21 10:43:20"
+    },
+    "db/Movie_Splice_Here_A_Projected_Odyssey_۲۰۲۴.json": {
+        "title": "Splice Here: A Projected Odyssey",
+        "year": "۲۰۲۴",
+        "url": "https://streamwide.tv/t/splice-here-a-projected-odyssey-688e80c8/",
+        "updated_at": "2026-08-21 10:43:28"
+    },
+    "db/Movie_The_Odyssey_۲۰۲۶.json": {
+        "title": "The Odyssey",
+        "year": "۲۰۲۶",
+        "url": "https://streamwide.tv/t/the-odyssey-783835e1/",
+        "updated_at": "2026-08-21 10:43:42"
+    },
+    "db/Series_An_Oriental_Odyssey_۲۰۱۸.json": {
+        "title": "An Oriental Odyssey",
+        "year": "۲۰۱۸",
+        "url": "https://streamwide.tv/t/an-oriental-odyssey-025e9021/",
+        "updated_at": "2026-08-21 10:43:56"
     }
 }
